@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Medical Visualization</title>
+    <!-- Include AR.js and A-Frame -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #controls select, #controls input, #controls button {
+            margin: 5px 0;
+            display: block;
+            width: 90%;
+        }
+        #gps-path {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Controls for interaction -->
+    <div id="controls">
+        <label for="model-select">Choisir un organe :</label>
+        <select id="model-select">
+            <option value="colon.glb">Colon</option>
+            <option value="liver.glb">Foie</option>
+        </select>
+
+        <label for="scale">Échelle :</label>
+        <input type="range" id="scale" min="0.1" max="2" step="0.1" value="1">
+
+        <label for="rotation">Rotation (Z) :</label>
+        <input type="range" id="rotation" min="0" max="360" step="1" value="0">
+
+        <label for="opacity">Transparence :</label>
+        <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="1">
+
+        <button id="toggle-tumor">Montrer/Cacher Tumeur</button>
+        <button id="toggle-gps">Montrer/Cacher Trajet GPS</button>
+    </div>
+
+    <!-- A-Frame scene -->
+    <a-scene embedded arjs="sourceType: webcam; detectionMode: mono; matrixCodeType: 3x3;">
+        <!-- Marker (Hiro) -->
+        <a-marker preset="hiro">
+            <!-- 3D Model (initially colon.glb) -->
+            <a-entity id="organ-model" gltf-model="url(colon.glb)" position="0 0 0" scale="1 1 1"></a-entity>
+            <!-- Tumor (simulated as a red sphere, hidden by default) -->
+            <a-sphere id="tumor" color="red" radius="0.2" position="0.5 0.5 0" visible="false"></a-sphere>
+            <!-- GPS Path (simulated as a white line, hidden by default) -->
+            <a-entity id="gps-path" geometry="primitive: cylinder; radius: 0.05; height: 2" material="color: white" position="0 1 0" rotation="90 0 0"></a-entity>
+        </a-marker>
+
+        <!-- Camera -->
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        // Get elements
+        const modelSelect = document.getElementById('model-select');
+        const scaleSlider = document.getElementById('scale');
+        const rotationSlider = document.getElementById('rotation');
+        const opacitySlider = document.getElementById('opacity');
+        const toggleTumorBtn = document.getElementById('toggle-tumor');
+        const toggleGpsBtn = document.getElementById('toggle-gps');
+        const organModel = document.getElementById('organ-model');
+        const tumor = document.getElementById('tumor');
+        const gpsPath = document.getElementById('gps-path');
+
+        // Change model
+        modelSelect.addEventListener('change', () => {
+            const modelUrl = modelSelect.value;
+            organModel.setAttribute('gltf-model', `url(${modelUrl})`);
+        });
+
+        // Adjust scale
+        scaleSlider.addEventListener('input', () => {
+            const scale = scaleSlider.value;
+            organModel.setAttribute('scale', `${scale} ${scale} ${scale}`);
+        });
+
+        // Adjust rotation (Z-axis)
+        rotationSlider.addEventListener('input', () => {
+            const rotation = rotationSlider.value;
+            organModel.setAttribute('rotation', `0 0 ${rotation}`);
+        });
+
+        // Adjust opacity
+        opacitySlider.addEventListener('input', () => {
+            const opacity = opacitySlider.value;
+            organModel.setAttribute('material', `opacity: ${opacity}; transparent: true`);
+        });
+
+        // Toggle tumor visibility
+        let tumorVisible = false;
+        toggleTumorBtn.addEventListener('click', () => {
+            tumorVisible = !tumorVisible;
+            tumor.setAttribute('visible', tumorVisible);
+            toggleTumorBtn.textContent = tumorVisible ? 'Cacher Tumeur' : 'Montrer Tumeur';
+        });
+
+        // Toggle GPS path visibility
+        let gpsVisible = false;
+        toggleGpsBtn.addEventListener('click', () => {
+            gpsVisible = !gpsVisible;
+            gpsPath.setAttribute('visible', gpsVisible);
+            toggleGpsBtn.textContent = gpsVisible ? 'Cacher Trajet GPS' : 'Montrer Trajet GPS';
+        });
+    </script>
+</body>
+</html>
