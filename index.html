@@ -135,7 +135,7 @@
             const organModel = document.getElementById('organ-model');
             
             addNotification(`Loading model: ${modelFile}...`, 'info');
-            organModel.setAttribute('gltf-model', `url(${modelUrl}`); // Note: Removed closing parenthesis intentionally to trigger error for demonstration
+            organModel.setAttribute('gltf-model', modelUrl); // Fixed: Removed 'url()' wrapper and added proper syntax
             organModel.addEventListener('model-loaded', () => {
                 addNotification(`Model ${modelFile} loaded successfully.`, 'success');
                 organModel.setAttribute('visible', true);
