@@ -3,12 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Medical Visualization on PC with Hand Gestures</title>
+    <title>AR Organ Viewer on PC</title>
     <!-- Include A-Frame -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <!-- Include MediaPipe Hands -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <!-- Include aframe-extras for mouse controls -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -29,14 +28,14 @@
             display: block;
             width: 90%;
         }
-        #video {
+        #webcam-feed {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            width: 320px;
-            height: 240px;
-            z-index: 1;
-            transform: scaleX(-1); /* Miroir pour correspondre à la caméra */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
         }
         a-scene {
             position: absolute;
@@ -49,74 +48,128 @@
     </style>
 </head>
 <body>
-    <!-- Contrôles pour choisir les organes -->
+    <!-- Interface de contrôle -->
     <div id="controls">
-        <label for="organ-select">Choisir un organe :</label>
-        <select id="organ-select">
+        <label for="model-select">Choose a model:</label>
+        <select id="model-select">
             <option value="colon.glb">Colon</option>
             <option value="liver.glb">Foie</option>
             <option value="Segment_1.glb">Segment 1</option>
             <option value="aorta.glb">Aorte</option>
         </select>
-        <button id="load-organ">Charger l'organe</button>
+        <button id="load-model">Load Model</button>
+        <button id="reset-model">Reset Position</button>
     </div>
+
+    <!-- Webcam feed as background -->
+    <video id="webcam-feed" autoplay playsinline></video>
 
     <!-- Scène A-Frame -->
     <a-scene embedded>
-        <a-entity id="organ-model" gltf-model="url(colon.glb)" position="0 0 -2" scale="1 1 1" visible="false"></a-entity>
+        <a-entity id="organ-model" 
+                  gltf-model=""
+                  position="0 0 -2"
+                  scale="1 1 1"
+                  rotation="0 0 0"
+                  visible="false"
+                  aframe-extras="drag; rotate; pinch">
+        </a-entity>
         <a-entity camera position="0 1.6 0"></a-entity>
     </a-scene>
 
-    <!-- Vidéo pour la caméra -->
-    <video id="video" autoplay playsinline></video>
-
     <script>
-        // Initialisation de MediaPipe Hands
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({
-            maxNumHands: 2,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-        const camera = new Camera(document.getElementById('video'), {
-            onFrame: async () => await hands.send({image: document.getElementById('video')}),
-            width: 1280,
-            height: 720
-        });
-        hands.onResults(onResults);
-        camera.start();
+        // Accéder à la webcam
+        const video = document.getElementById('webcam-feed');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing webcam: ", err);
+                alert("Could not access webcam. Please ensure it's connected and permissions are granted.");
+            });
 
-        // Gestion des gestes
-        let isLeftHandUp = false;
-        let isRightHandUp = false;
-        function onResults(results) {
-            if (results.multiHandLandmarks) {
-                for (const landmarks of results.multiHandLandmarks) {
-                    const hand = results.multiHandedness.find(h => h.index === landmarks[0].visibility).label;
-                    const indexFinger = landmarks[8]; // Pointe de l'index
-                    const wrist = landmarks[0]; // Poignet
-                    const distance = Math.hypot(indexFinger.x - wrist.x, indexFinger.y - wrist.y);
-                    if (hand === 'Left' && indexFinger.y < wrist.y && distance > 0.1) isLeftHandUp = true;
-                    if (hand === 'Right' && indexFinger.y < wrist.y && distance > 0.1) isRightHandUp = true;
+        // Charger le modèle sélectionné
+        document.getElementById('load-model').addEventListener('click', () => {
+            const select = document.getElementById('model-select');
+            const modelFile = select.value;
+            const modelUrl = `https://guiratsarra.github.io/ar-medical-app/${modelFile}`;
+            const organModel = document.getElementById('organ-model');
+            organModel.setAttribute('gltf-model', `url(${modelUrl})`);
+            organModel.setAttribute('visible', true);
+        });
+
+        // Réinitialiser la position, rotation et échelle
+        document.getElementById('reset-model').addEventListener('click', () => {
+            const organModel = document.getElementById('organ-model');
+            organModel.setAttribute('position', '0 0 -2');
+            organModel.setAttribute('rotation', '0 0 0');
+            organModel.setAttribute('scale', '1 1 1');
+        });
+
+        // Ajouter des contrôles de la souris pour déplacer, tourner et zoomer
+        AFRAME.registerComponent('aframe-extras', {
+            schema: {
+                drag: { default: true },
+                rotate: { default: true },
+                pinch: { default: true }
+            },
+            init: function () {
+                this.el.addEventListener('mousedown', (event) => {
+                    if (event.button === 0) { // Clic gauche pour déplacer
+                        this.startDrag(event);
+                    } else if (event.button === 2) { // Clic droit pour tourner
+                        this.startRotate(event);
+                    }
+                });
+                this.el.addEventListener('mouseup', () => this.stopDrag());
+                this.el.addEventListener('mousemove', (event) => this.onMouseMove(event));
+                this.el.addEventListener('wheel', (event) => this.onWheel(event));
+            },
+            startDrag: function (event) {
+                this.isDragging = true;
+                this.startX = event.clientX;
+                this.startY = event.clientY;
+                this.startPosition = this.el.getAttribute('position');
+            },
+            startRotate: function (event) {
+                this.isRotating = true;
+                this.startX = event.clientX;
+                this.startY = event.clientY;
+                this.startRotation = this.el.getAttribute('rotation');
+            },
+            stopDrag: function () {
+                this.isDragging = false;
+                this.isRotating = false;
+            },
+            onMouseMove: function (event) {
+                if (this.isDragging) {
+                    const deltaX = (event.clientX - this.startX) * 0.01;
+                    const deltaY = (event.clientY - this.startY) * 0.01;
+                    const newPos = {
+                        x: this.startPosition.x + deltaX,
+                        y: this.startPosition.y - deltaY,
+                        z: this.startPosition.z
+                    };
+                    this.el.setAttribute('position', newPos);
+                } else if (this.isRotating) {
+                    const deltaX = (event.clientX - this.startX) * 0.5;
+                    const deltaY = (event.clientY - this.startY) * 0.5;
+                    const newRot = {
+                        x: this.startRotation.x + deltaY,
+                        y: this.startRotation.y + deltaX,
+                        z: this.startRotation.z
+                    };
+                    this.el.setAttribute('rotation', newRot);
                 }
-                // Si les deux mains sont levées, toggle la visibilité
-                if (isLeftHandUp && isRightHandUp) {
-                    const model = document.getElementById('organ-model');
-                    model.setAttribute('visible', !model.getAttribute('visible'));
-                    isLeftHandUp = false;
-                    isRightHandUp = false;
-                }
+            },
+            onWheel: function (event) {
+                event.preventDefault();
+                const scale = this.el.getAttribute('scale');
+                const delta = event.deltaY * -0.001;
+                const newScale = Math.max(0.1, scale.x + delta);
+                this.el.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
             }
-        }
-
-        // Charger l'organe sélectionné
-        document.getElementById('load-organ').addEventListener('click', () => {
-            const select = document.getElementById('organ-select');
-            const modelUrl = select.value;
-            const model = document.getElementById('organ-model');
-            model.setAttribute('gltf-model', `url(${modelUrl})`);
-            model.setAttribute('visible', false); // Caché jusqu'à ce que le geste soit détecté
         });
     </script>
 </body>
