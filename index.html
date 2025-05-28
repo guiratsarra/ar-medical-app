@@ -135,7 +135,8 @@
             const organModel = document.getElementById('organ-model');
             
             addNotification(`Loading model: ${modelFile}...`, 'info');
-            organModel.setAttribute('gltf-model', modelUrl); // Fixed: Removed 'url()' wrapper and added proper syntax
+            console.log('Setting gltf-model to:', modelUrl); // Debug log
+            organModel.setAttribute('gltf-model', modelUrl); // Correct syntax
             organModel.addEventListener('model-loaded', () => {
                 addNotification(`Model ${modelFile} loaded successfully.`, 'success');
                 organModel.setAttribute('visible', true);
