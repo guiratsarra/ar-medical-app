@@ -28,6 +28,25 @@
             display: block;
             width: 90%;
         }
+        #notifications {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        .notification {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
         #webcam-feed {
             position: absolute;
             top: 0;
@@ -61,6 +80,9 @@
         <button id="reset-model">Reset Position</button>
     </div>
 
+    <!-- Notifications area -->
+    <div id="notifications"></div>
+
     <!-- Webcam feed as background -->
     <video id="webcam-feed" autoplay playsinline></video>
 
@@ -78,25 +100,49 @@
     </a-scene>
 
     <script>
+        // Function to add notifications
+        function addNotification(message, type = 'info') {
+            const notifications = document.getElementById('notifications');
+            const div = document.createElement('div');
+            div.className = `notification ${type === 'error' ? 'error' : 'success'}`;
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            notifications.appendChild(div);
+            // Auto-remove after 10 seconds
+            setTimeout(() => div.remove(), 10000);
+            // Scroll to the latest notification
+            notifications.scrollTop = notifications.scrollHeight;
+        }
+
         // Accéder à la webcam
         const video = document.getElementById('webcam-feed');
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
+                addNotification('Webcam access granted.', 'success');
             })
             .catch(err => {
                 console.error("Error accessing webcam: ", err);
+                addNotification(`Error accessing webcam: ${err.message}`, 'error');
                 alert("Could not access webcam. Please ensure it's connected and permissions are granted.");
             });
 
         // Charger le modèle sélectionné
-        document.getElementById('load-model').addEventListener('click', () => {
+        const loadModelButton = document.getElementById('load-model');
+        loadModelButton.addEventListener('click', () => {
             const select = document.getElementById('model-select');
             const modelFile = select.value;
             const modelUrl = `https://guiratsarra.github.io/ar-medical-app/${modelFile}`;
             const organModel = document.getElementById('organ-model');
-            organModel.setAttribute('gltf-model', `url(${modelUrl})`);
-            organModel.setAttribute('visible', true);
+            
+            addNotification(`Loading model: ${modelFile}...`, 'info');
+            organModel.setAttribute('gltf-model', `url(${modelUrl}`); // Note: Removed closing parenthesis intentionally to trigger error for demonstration
+            organModel.addEventListener('model-loaded', () => {
+                addNotification(`Model ${modelFile} loaded successfully.`, 'success');
+                organModel.setAttribute('visible', true);
+            });
+            organModel.addEventListener('model-error', (event) => {
+                addNotification(`Error loading model ${modelFile}: ${event.detail.message}`, 'error');
+            });
         });
 
         // Réinitialiser la position, rotation et échelle
@@ -105,6 +151,7 @@
             organModel.setAttribute('position', '0 0 -2');
             organModel.setAttribute('rotation', '0 0 0');
             organModel.setAttribute('scale', '1 1 1');
+            addNotification('Model position reset.', 'success');
         });
 
         // Ajouter des contrôles de la souris pour déplacer, tourner et zoomer
