@@ -1,224 +1,168 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Organ Viewer on PC</title>
-    <!-- Include A-Frame -->
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <!-- Include aframe-extras for mouse controls -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        #controls {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-        }
-        #controls select, #controls button {
-            margin: 5px 0;
-            display: block;
-            width: 90%;
-        }
-        #notifications {
-            position: absolute;
-            top: 50px;
-            left: 10px;
-            z-index: 1;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-size: 14px;
-        }
-        .notification {
-            margin: 5px 0;
-            padding: 5px;
-            border-radius: 3px;
-        }
-        .success { background-color: #d4edda; color: #155724; }
-        .error { background-color: #f8d7da; color: #721c24; }
-        #webcam-feed {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: -1;
-        }
-        a-scene {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AR Multi-Organ Viewer</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 2;
+      width: 250px;
+      max-height: 90%;
+      overflow-y: auto;
+    }
+
+    #controls label, #controls select, #controls input, #controls button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    #notifications {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 8px;
+      max-width: 300px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    .notification.success { color: green; }
+    .notification.error { color: red; }
+
+    video#webcam-feed {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+
+    a-scene {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+  </style>
 </head>
 <body>
-    <!-- Interface de contrôle -->
-    <div id="controls">
-        <label for="model-select">Choose a model:</label>
-        <select id="model-select">
-            <option value="colon.glb">Colon</option>
-            <option value="liver.glb">Foie</option>
-            <option value="Segment_1.glb">Segment 1</option>
-            <option value="aorta.glb">Aorte</option>
-        </select>
-        <button id="load-model">Load Model</button>
-        <button id="reset-model">Reset Position</button>
-    </div>
 
-    <!-- Notifications area -->
-    <div id="notifications"></div>
+  <!-- Controls UI -->
+  <div id="controls">
+    <label>Choose Organ Model:</label>
+    <select id="model-select">
+      <option value="colon.glb">Colon</option>
+      <option value="liver.glb">Foie</option>
+      <option value="Segment_1.glb">Segment 1</option>
+      <option value="aorta.glb">Aorte</option>
+    </select>
 
-    <!-- Webcam feed as background -->
-    <video id="webcam-feed" autoplay playsinline></video>
+    <label for="color">Color:</label>
+    <input type="color" id="color" value="#ff0000">
 
-    <!-- Scène A-Frame -->
-    <a-scene embedded>
-        <a-entity id="organ-model" 
-                  gltf-model=""
-                  position="0 0 -2"
-                  scale="1 1 1"
-                  rotation="0 0 0"
-                  visible="false"
-                  aframe-extras="drag; rotate; pinch">
-        </a-entity>
-        <a-entity camera position="0 1.6 0"></a-entity>
-    </a-scene>
+    <label>Position (x y z):</label>
+    <input type="text" id="position" placeholder="0 0 -2" value="0 0 -2">
 
-    <script>
-        // Function to add notifications
-        function addNotification(message, type = 'info') {
-            const notifications = document.getElementById('notifications');
-            const div = document.createElement('div');
-            div.className = `notification ${type === 'error' ? 'error' : 'success'}`;
-            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
-            notifications.appendChild(div);
-            // Auto-remove after 10 seconds
-            setTimeout(() => div.remove(), 10000);
-            // Scroll to the latest notification
-            notifications.scrollTop = notifications.scrollHeight;
-        }
+    <button id="add-model">Add Organ</button>
+    <button id="reset-scene">Clear Scene</button>
+  </div>
 
-        // Accéder à la webcam
-        const video = document.getElementById('webcam-feed');
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                video.srcObject = stream;
-                addNotification('Webcam access granted.', 'success');
-            })
-            .catch(err => {
-                console.error("Error accessing webcam: ", err);
-                addNotification(`Error accessing webcam: ${err.message}`, 'error');
-                alert("Could not access webcam. Please ensure it's connected and permissions are granted.");
-            });
+  <!-- Notifications -->
+  <div id="notifications"></div>
 
-        // Charger le modèle sélectionné
-        const loadModelButton = document.getElementById('load-model');
-        loadModelButton.addEventListener('click', () => {
-            const select = document.getElementById('model-select');
-            const modelFile = select.value;
-            const modelUrl = `https://guiratsarra.github.io/ar-medical-app/${modelFile}`;
-            const organModel = document.getElementById('organ-model');
-            
-            addNotification(`Loading model: ${modelFile}...`, 'info');
-            console.log('Setting gltf-model to:', modelUrl); // Debug log
-            organModel.setAttribute('gltf-model', modelUrl); // Correct syntax
-            organModel.addEventListener('model-loaded', () => {
-                addNotification(`Model ${modelFile} loaded successfully.`, 'success');
-                organModel.setAttribute('visible', true);
-            });
-            organModel.addEventListener('model-error', (event) => {
-                addNotification(`Error loading model ${modelFile}: ${event.detail.message}`, 'error');
-            });
-        });
+  <!-- Webcam background -->
+  <video id="webcam-feed" autoplay playsinline></video>
 
-        // Réinitialiser la position, rotation et échelle
-        document.getElementById('reset-model').addEventListener('click', () => {
-            const organModel = document.getElementById('organ-model');
-            organModel.setAttribute('position', '0 0 -2');
-            organModel.setAttribute('rotation', '0 0 0');
-            organModel.setAttribute('scale', '1 1 1');
-            addNotification('Model position reset.', 'success');
-        });
+  <!-- A-Frame Scene -->
+  <a-scene embedded>
+    <a-entity camera position="0 1.6 0"></a-entity>
+  </a-scene>
 
-        // Ajouter des contrôles de la souris pour déplacer, tourner et zoomer
-        AFRAME.registerComponent('aframe-extras', {
-            schema: {
-                drag: { default: true },
-                rotate: { default: true },
-                pinch: { default: true }
-            },
-            init: function () {
-                this.el.addEventListener('mousedown', (event) => {
-                    if (event.button === 0) { // Clic gauche pour déplacer
-                        this.startDrag(event);
-                    } else if (event.button === 2) { // Clic droit pour tourner
-                        this.startRotate(event);
-                    }
-                });
-                this.el.addEventListener('mouseup', () => this.stopDrag());
-                this.el.addEventListener('mousemove', (event) => this.onMouseMove(event));
-                this.el.addEventListener('wheel', (event) => this.onWheel(event));
-            },
-            startDrag: function (event) {
-                this.isDragging = true;
-                this.startX = event.clientX;
-                this.startY = event.clientY;
-                this.startPosition = this.el.getAttribute('position');
-            },
-            startRotate: function (event) {
-                this.isRotating = true;
-                this.startX = event.clientX;
-                this.startY = event.clientY;
-                this.startRotation = this.el.getAttribute('rotation');
-            },
-            stopDrag: function () {
-                this.isDragging = false;
-                this.isRotating = false;
-            },
-            onMouseMove: function (event) {
-                if (this.isDragging) {
-                    const deltaX = (event.clientX - this.startX) * 0.01;
-                    const deltaY = (event.clientY - this.startY) * 0.01;
-                    const newPos = {
-                        x: this.startPosition.x + deltaX,
-                        y: this.startPosition.y - deltaY,
-                        z: this.startPosition.z
-                    };
-                    this.el.setAttribute('position', newPos);
-                } else if (this.isRotating) {
-                    const deltaX = (event.clientX - this.startX) * 0.5;
-                    const deltaY = (event.clientY - this.startY) * 0.5;
-                    const newRot = {
-                        x: this.startRotation.x + deltaY,
-                        y: this.startRotation.y + deltaX,
-                        z: this.startRotation.z
-                    };
-                    this.el.setAttribute('rotation', newRot);
-                }
-            },
-            onWheel: function (event) {
-                event.preventDefault();
-                const scale = this.el.getAttribute('scale');
-                const delta = event.deltaY * -0.001;
-                const newScale = Math.max(0.1, scale.x + delta);
-                this.el.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
+  <script>
+    const scene = document.querySelector('a-scene');
+    const notifications = document.getElementById('notifications');
+
+    function notify(msg, type = 'success') {
+      const div = document.createElement('div');
+      div.className = `notification ${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      notifications.appendChild(div);
+      setTimeout(() => div.remove(), 10000);
+    }
+
+    // Webcam feed
+    const video = document.getElementById('webcam-feed');
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+        notify('Webcam started.', 'success');
+      })
+      .catch(err => {
+        notify(`Webcam error: ${err.message}`, 'error');
+        alert("Webcam access denied or unavailable.");
+      });
+
+    // Load organ model with attributes
+    let organCount = 0;
+    document.getElementById('add-model').addEventListener('click', () => {
+      const modelFile = document.getElementById('model-select').value;
+      const color = document.getElementById('color').value;
+      const position = document.getElementById('position').value;
+
+      const id = `organ-${organCount++}`;
+      const modelUrl = `https://guiratsarra.github.io/ar-medical-app/${modelFile}`;
+
+      const organ = document.createElement('a-entity');
+      organ.setAttribute('id', id);
+      organ.setAttribute('gltf-model', modelUrl);
+      organ.setAttribute('position', position);
+      organ.setAttribute('scale', '1 1 1');
+      organ.setAttribute('rotation', '0 0 0');
+      organ.setAttribute('visible', 'true');
+      organ.setAttribute('gesture-handler', ''); // Optional touch/mouse control
+
+      organ.addEventListener('model-loaded', () => {
+        notify(`Model "${modelFile}" loaded as ${id}.`);
+
+        const mesh = organ.getObject3D('mesh');
+        if (mesh) {
+          mesh.traverse(node => {
+            if (node.isMesh) {
+              node.material.color.set(color);
             }
-        });
-    </script>
+          });
+        }
+      });
+
+      scene.appendChild(organ);
+    });
+
+    // Reset / clear scene
+    document.getElementById('reset-scene').addEventListener('click', () => {
+      document.querySelectorAll('a-entity[id^="organ-"]').forEach(el => el.remove());
+      notify("Scene cleared.");
+      organCount = 0;
+    });
+  </script>
 </body>
 </html>
